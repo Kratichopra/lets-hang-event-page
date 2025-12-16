@@ -7,6 +7,7 @@ export const eventState = atom<Event>({
   key: 'eventState',
   default: {
     name: '',
+    phoneNumber: '',
     dateTime: '',
     location: '',
     description: '',

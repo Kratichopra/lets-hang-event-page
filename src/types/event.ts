@@ -1,6 +1,7 @@
 export interface Event {
   id?: string;
   name: string;
+  phoneNumber?: string; // Phone number to save the draft
   dateTime: string;
   location: string;
   description: string;

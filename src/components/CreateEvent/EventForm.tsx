@@ -3,10 +3,20 @@ import { useRecoilState } from 'recoil';
 import { eventState } from '../../state/atoms';
 import { createEvent, updateEvent } from '../../services/apiClient';
 import { CustomizeSection } from './CustomizeSection';
+import { Notification, type NotificationType } from '../Notification';
 
 export const EventForm = () => {
   const [event, setEvent] = useRecoilState(eventState);
   const [showMore, setShowMore] = useState(false);
+  const [notification, setNotification] = useState<{
+    message: string;
+    type: NotificationType;
+    isVisible: boolean;
+  }>({
+    message: '',
+    type: 'success',
+    isVisible: false,
+  });
 
   // Main visible modules (always shown)
   const mainModules = [
@@ -27,6 +37,10 @@ export const EventForm = () => {
 
   const handleSave = async () => {
     try {
+      // Preserve original images before sending to backend
+      const originalFlyerImage = event.flyerImage;
+      const originalBackgroundImage = event.backgroundImage;
+      
       let savedEvent;
       if (event.id) {
         // In real backend: savedEvent = await updateEvent(event);
@@ -35,12 +49,28 @@ export const EventForm = () => {
         // In real backend: savedEvent = await createEvent(event);
         savedEvent = await createEvent(event);
       }
-      setEvent(savedEvent);
-      alert('Event saved successfully!');
+      
+      // Merge saved event with original images to keep base64 data in frontend
+      const eventWithOriginalImages = {
+        ...savedEvent,
+        flyerImage: originalFlyerImage || savedEvent.flyerImage,
+        backgroundImage: originalBackgroundImage || savedEvent.backgroundImage,
+      };
+      
+      setEvent(eventWithOriginalImages);
+      setNotification({
+        message: 'Event saved successfully!',
+        type: 'success',
+        isVisible: true,
+      });
       console.log('Saved event:', savedEvent);
     } catch (error) {
       console.error('Error saving event:', error);
-      alert('Failed to save event. Please try again.');
+      setNotification({
+        message: 'Failed to save event. Please try again.',
+        type: 'error',
+        isVisible: true,
+      });
     }
   };
 
@@ -128,6 +158,41 @@ export const EventForm = () => {
               color: event.name ? 'transparent' : 'rgba(206, 189, 189)',
             }}
           />
+        </div>
+
+        {/* Phone number field */}
+        <div 
+          className="mb-6 rounded-xl border border-white/20 overflow-hidden"
+          style={{
+            backgroundImage: `
+              linear-gradient(var(--Materials-Ultrathin-2, #2525258C)),
+              linear-gradient(var(--Materials-Ultrathin-1, #9C9C9C))
+            `,
+            backgroundBlendMode: 'overlay',
+          }}
+        >
+          <div className="flex items-center justify-between px-4 py-3">
+            <div className="flex items-center flex-1">
+            ⚒️
+              <input
+                id="event-phone"
+                type="tel"
+                placeholder="Enter phone number to save the draft"
+                value={event.phoneNumber || ''}
+                onChange={(e) => handleFieldChange('phoneNumber' as keyof typeof event, e.target.value)}
+                className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-white placeholder:opacity-70 text-base"
+              />
+            </div>
+            <button
+              onClick={handleSave}
+              className="ml-2 w-8 h-8 bg-white/20 backdrop-blur-sm border border-white/30 rounded-full flex items-center justify-center hover:bg-white/30 transition-colors cursor-pointer"
+              title="Save draft"
+            >
+              <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         {/* Top section with Date, Location, and Cost fields */}
@@ -220,9 +285,10 @@ export const EventForm = () => {
                 }}
               >
                 <div className="flex items-center justify-between px-4 py-3 ">
+                👥 
                   <input
                     type="text"
-                    placeholder="Capacity"
+                    placeholder="  Add capacity"
                     value={event.capacity || ''}
                     onChange={(e) => handleFieldValueChange('capacity', e.target.value)}
                     className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-white placeholder:opacity-70 text-base"
@@ -277,27 +343,82 @@ export const EventForm = () => {
                   backgroundBlendMode: 'overlay',
                 }}
               >
-                <div className="flex items-center justify-between px-4 py-3">
-                  <input
-                    type="text"
-                    placeholder="Links (format: label, url)"
-                    value={event.links?.map(l => `${l.label}, ${l.url}`).join('; ') || ''}
-                    onChange={(e) => {
-                      const links = e.target.value.split(';').map(s => {
-                        const [label, url] = s.split(',').map(x => x.trim());
-                        return { label: label || '', url: url || '' };
-                      }).filter(l => l.label || l.url);
-                      handleFieldValueChange('links', links);
-                    }}
-                    className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-white placeholder:opacity-70 text-base"
-                  />
+                {/* Links list */}
+                <div className="px-4 py-3 space-y-3">
+                  {(() => {
+                    const displayLinks = event.links && event.links.length > 0 
+                      ? event.links 
+                      : [{ url: '', label: '' }];
+                    
+                    return displayLinks.map((link, index) => (
+                      <div key={index} className="flex items-center gap-2">
+                        <div className="flex items-center flex-1">
+                          <span className="text-white/70 mr-3">🔗</span>
+                          <input
+                            type="text"
+                            placeholder="Add link"
+                            value={link.url || ''}
+                            onChange={(e) => {
+                              const currentLinks = event.links && event.links.length > 0 
+                                ? [...event.links] 
+                                : [];
+                              
+                              // Ensure we have enough items in the array
+                              while (currentLinks.length <= index) {
+                                currentLinks.push({ url: '', label: '' });
+                              }
+                              
+                              currentLinks[index] = {
+                                url: e.target.value,
+                                label: e.target.value, // Use URL as label by default
+                              };
+                              
+                              handleFieldValueChange('links', currentLinks);
+                            }}
+                            className="flex-1 bg-transparent border-none outline-none text-white placeholder:text-white placeholder:opacity-70 text-base"
+                          />
+                        </div>
+                        {displayLinks.length > 1 && (
+                          <button
+                            onClick={() => {
+                              const currentLinks = event.links && event.links.length > 0 
+                                ? [...event.links] 
+                                : [];
+                              currentLinks.splice(index, 1);
+                              // Keep at least one empty link
+                              const finalLinks = currentLinks.length > 0 
+                                ? currentLinks 
+                                : [{ url: '', label: '' }];
+                              handleFieldValueChange('links', finalLinks);
+                            }}
+                            className="text-white/70 hover:text-white cursor-pointer text-xl"
+                            title="Remove link"
+                          >
+                            ×
+                          </button>
+                        )}
+                      </div>
+                    ));
+                  })()}
+                </div>
+
+                {/* Add another link button */}
+                <div className="px-4 pb-3">
                   <button
-                    onClick={() => handleRemoveField('links')}
-                    className="ml-2 text-white/70 hover:text-white cursor-pointer"
+                    onClick={() => {
+                      const currentLinks = event.links || [];
+                      handleFieldValueChange('links', [...currentLinks, { url: '', label: '' }]);
+                    }}
+                    className="flex items-center justify-center gap-2 w-full py-1 text-sm text-white/70 hover:text-white transition-colors cursor-pointer"
                   >
-                    ×
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                    </svg>
+                    <span>Add another link</span>
                   </button>
                 </div>
+
+             
               </div>
             )}
 
@@ -404,12 +525,19 @@ export const EventForm = () => {
         <CustomizeSection />
 
         <button 
-          className="mt-8 py-3.5 px-8 bg-white/10 backdrop-blur-md text-white border-none rounded-lg text-base font-semibold cursor-pointer transition-all duration-200 w-full hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(102,126,234,0.4)] active:translate-y-0"
+          className="mt-8 py-3.5 px-8 bg-white/10 backdrop-blur-md text-white border-2 border-white rounded-full rounded-lg text-base font-semibold cursor-pointer transition-all duration-200 w-full hover:-translate-y-0.5 hover:shadow-[0_6px_20px_rgba(102,126,234,0.4)] active:translate-y-0"
           onClick={handleSave}
         >
           🚀 Go live
         </button>
       </div>
+
+      <Notification
+        message={notification.message}
+        type={notification.type}
+        isVisible={notification.isVisible}
+        onClose={() => setNotification({ ...notification, isVisible: false })}
+      />
     </div>
   );
 };

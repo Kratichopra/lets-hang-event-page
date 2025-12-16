@@ -1,5 +1,14 @@
+# Events and images
+events/
+*.json
+
+# Node modules
 node_modules/
-.env
+
+# Logs
 *.log
+npm-debug.log*
 
-
+# Environment variables
+.env
+.env.local
