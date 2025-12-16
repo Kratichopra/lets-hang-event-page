@@ -1,4 +1,4 @@
-# Let's Hang - Event Management Application
+# Let's Hang - Event Page
 
 A modern, feature-rich event management application built with React and TypeScript. Create, customize, and manage events with an intuitive interface and glassmorphic design.
 
